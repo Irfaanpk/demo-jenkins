@@ -8,7 +8,7 @@ pipeline {
 
         IMAGE_TAG = "${BUILD_NUMBER}"
 
-        EC2_IP = "54.234.197.248"
+        EC2_IP = "54.86.160.42"
     }
 
     stages {
@@ -73,29 +73,26 @@ pipeline {
 
             steps {
 
-                sshagent(['ssh-creds']) {
+                bat """
+                ssh -i C:\\jenkins-key\\ec2-key.pem -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "
 
-                    bat """
-                    ssh -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "
+                docker pull %DOCKER_HUB%/backend:%IMAGE_TAG%
 
-                    docker pull %DOCKER_HUB%/backend:%IMAGE_TAG%
+                docker pull %DOCKER_HUB%/frontend:%IMAGE_TAG%
 
-                    docker pull %DOCKER_HUB%/frontend:%IMAGE_TAG%
+                docker stop backend || exit 0
+                docker rm backend || exit 0
 
-                    docker stop backend || exit 0
-                    docker rm backend || exit 0
+                docker stop frontend || exit 0
+                docker rm frontend || exit 0
 
-                    docker stop frontend || exit 0
-                    docker rm frontend || exit 0
+                docker network create app-network || exit 0
 
-                    docker network create app-network || exit 0
+                docker run -d --name backend --network app-network -p 5000:5000 %DOCKER_HUB%/backend:%IMAGE_TAG%
 
-                    docker run -d --name backend --network app-network -p 5000:5000 %DOCKER_HUB%/backend:%IMAGE_TAG%
-
-                    docker run -d --name frontend --network app-network -p 3000:3000 %DOCKER_HUB%/frontend:%IMAGE_TAG%
-                    "
-                    """
-                }
+                docker run -d --name frontend --network app-network -p 3000:3000 %DOCKER_HUB%/frontend:%IMAGE_TAG%
+                "
+                """
             }
         }
     }
