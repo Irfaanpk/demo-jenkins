@@ -3,54 +3,60 @@ pipeline {
     agent any
 
     environment {
-
         DOCKER_HUB = "irfaanpk"
-
         IMAGE_TAG = "${BUILD_NUMBER}"
-
         EC2_IP = "54.234.197.248"
     }
 
     stages {
 
         stage('Clone Code') {
-
             steps {
-
                 git branch: 'main',
                 url: 'https://github.com/Irfaanpk/demo-jenkins.git'
             }
         }
 
-        stage('Build Docker Images') {
-
+        stage('Build Backend Image') {
             steps {
-
-                sh '''
-                docker build -t $DOCKER_HUB/backend:$IMAGE_TAG ./backend
-
-                docker build -t $DOCKER_HUB/frontend:$IMAGE_TAG ./frontend
-                '''
+                dir('backend') {
+                    sh """
+                    docker build -t $DOCKER_HUB/backend:$IMAGE_TAG .
+                    docker tag $DOCKER_HUB/backend:$IMAGE_TAG $DOCKER_HUB/backend:latest
+                    """
+                }
             }
         }
 
-        stage('Push Docker Images') {
+        stage('Build Frontend Image') {
+            steps {
+                dir('frontend') {
+                    sh """
+                    docker build -t $DOCKER_HUB/frontend:$IMAGE_TAG .
+                    docker tag $DOCKER_HUB/frontend:$IMAGE_TAG $DOCKER_HUB/frontend:latest
+                    """
+                }
+            }
+        }
 
+        stage('Push Images') {
             steps {
 
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
                 )]) {
 
-                    sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
+                    sh """
+                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
 
                     docker push $DOCKER_HUB/backend:$IMAGE_TAG
+                    docker push $DOCKER_HUB/backend:latest
 
                     docker push $DOCKER_HUB/frontend:$IMAGE_TAG
-                    '''
+                    docker push $DOCKER_HUB/frontend:latest
+                    """
                 }
             }
         }
@@ -59,19 +65,19 @@ pipeline {
 
             steps {
 
-                sshagent(['ec2-ssh']) {
+                sshagent(['ssh-creds']) {
 
                     sh """
                     ssh -o StrictHostKeyChecking=no ubuntu@$EC2_IP '
 
-                    docker stop frontend || true
-                    docker rm frontend || true
+                    docker pull $DOCKER_HUB/backend:latest
+                    docker pull $DOCKER_HUB/frontend:latest
 
                     docker stop backend || true
                     docker rm backend || true
 
-                    docker pull $DOCKER_HUB/backend:$IMAGE_TAG
-                    docker pull $DOCKER_HUB/frontend:$IMAGE_TAG
+                    docker stop frontend || true
+                    docker rm frontend || true
 
                     docker network create app-network || true
 
@@ -79,17 +85,32 @@ pipeline {
                     --name backend \
                     --network app-network \
                     -p 5000:5000 \
-                    $DOCKER_HUB/backend:$IMAGE_TAG
+                    --restart always \
+                    $DOCKER_HUB/backend:latest
 
                     docker run -d \
                     --name frontend \
                     --network app-network \
                     -p 3000:3000 \
-                    $DOCKER_HUB/frontend:$IMAGE_TAG
+                    --restart always \
+                    $DOCKER_HUB/frontend:latest
+
+                    docker image prune -f
                     '
                     """
                 }
             }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Deployment Successful'
+        }
+
+        failure {
+            echo 'Deployment Failed'
         }
     }
 }
