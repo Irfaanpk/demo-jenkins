@@ -8,7 +8,7 @@ pipeline {
 
         IMAGE_TAG = "${BUILD_NUMBER}"
 
-        EC2_IP = "54.86.160.42"
+        DEPLOY_SERVER = "35.175.211.245"
     }
 
     stages {
@@ -28,8 +28,8 @@ pipeline {
 
                 dir('backend') {
 
-                    bat '''
-                    docker build -t %DOCKER_HUB%/backend:%IMAGE_TAG% .
+                    sh '''
+                    docker build -t $DOCKER_HUB/backend:$IMAGE_TAG .
                     '''
                 }
             }
@@ -41,8 +41,8 @@ pipeline {
 
                 dir('frontend') {
 
-                    bat '''
-                    docker build -t %DOCKER_HUB%/frontend:%IMAGE_TAG% .
+                    sh '''
+                    docker build -t $DOCKER_HUB/frontend:$IMAGE_TAG .
                     '''
                 }
             }
@@ -58,41 +58,38 @@ pipeline {
                     passwordVariable: 'PASS'
                 )]) {
 
-                    bat '''
-                    echo %PASS% | docker login -u %USER% --password-stdin
+                    sh '''
+                    echo $PASS | docker login -u $USER --password-stdin
 
-                    docker push %DOCKER_HUB%/backend:%IMAGE_TAG%
+                    docker push $DOCKER_HUB/backend:$IMAGE_TAG
 
-                    docker push %DOCKER_HUB%/frontend:%IMAGE_TAG%
+                    docker push $DOCKER_HUB/frontend:$IMAGE_TAG
                     '''
                 }
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Deploy') {
 
             steps {
 
-                bat """
-                ssh -i C:\\jenkins-key\\ec2-key.pem -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "
+                sshagent(['ssh-creds']) {
 
-                docker pull %DOCKER_HUB%/backend:%IMAGE_TAG%
+                    sh '''
+                    scp -o StrictHostKeyChecking=no docker-compose.yml ubuntu@$DEPLOY_SERVER:/home/ubuntu/
 
-                docker pull %DOCKER_HUB%/frontend:%IMAGE_TAG%
+                    ssh -o StrictHostKeyChecking=no ubuntu@$DEPLOY_SERVER "
 
-                docker stop backend || exit 0
-                docker rm backend || exit 0
+                    export IMAGE_TAG=$IMAGE_TAG
 
-                docker stop frontend || exit 0
-                docker rm frontend || exit 0
+                    docker-compose down || true
 
-                docker network create app-network || exit 0
+                    docker-compose pull
 
-                docker run -d --name backend --network app-network -p 5000:5000 %DOCKER_HUB%/backend:%IMAGE_TAG%
-
-                docker run -d --name frontend --network app-network -p 3000:3000 %DOCKER_HUB%/frontend:%IMAGE_TAG%
-                "
-                """
+                    docker-compose up -d
+                    "
+                    '''
+                }
             }
         }
     }
@@ -101,12 +98,12 @@ pipeline {
 
         success {
 
-            echo 'Deployment Successful'
+            echo 'Deployment Successful 🚀'
         }
 
         failure {
 
-            echo 'Deployment Failed'
+            echo 'Deployment Failed ❌'
         }
     }
 }
