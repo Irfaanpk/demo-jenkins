@@ -2,6 +2,7 @@ services:
 
   mongo:
     image: mongo
+
     container_name: mongo
 
     ports:
@@ -9,6 +10,7 @@ services:
 
   backend:
     image: irfaanpk/backend:${IMAGE_TAG}
+
     container_name: backend
 
     ports:
@@ -19,6 +21,7 @@ services:
 
   frontend:
     image: irfaanpk/frontend:${IMAGE_TAG}
+
     container_name: frontend
 
     ports:
