@@ -1,14 +1,16 @@
-version: "3"
-
 services:
 
   mongo:
     image: mongo
+    container_name: mongo
+
     ports:
       - "27017:27017"
 
   backend:
-    build: ./backend
+    image: irfaanpk/backend:${IMAGE_TAG}
+    container_name: backend
+
     ports:
       - "5000:5000"
 
@@ -16,7 +18,9 @@ services:
       - mongo
 
   frontend:
-    build: ./frontend
+    image: irfaanpk/frontend:${IMAGE_TAG}
+    container_name: frontend
+
     ports:
       - "3000:3000"
 
