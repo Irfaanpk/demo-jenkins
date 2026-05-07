@@ -75,11 +75,10 @@ pipeline {
 
                 sshagent(['ssh-creds']) {
 
-                    sh '''
+                    sh """
                     scp -o StrictHostKeyChecking=no docker-compose.yml ubuntu@$DEPLOY_SERVER:/home/ubuntu/
 
-                    ssh -o StrictHostKeyChecking=no ubuntu@$DEPLOY_SERVER << EOF
-
+                    ssh -o StrictHostKeyChecking=no ubuntu@$DEPLOY_SERVER '
                     export IMAGE_TAG=$IMAGE_TAG
 
                     docker compose down || true
@@ -87,9 +86,8 @@ pipeline {
                     docker compose pull
 
                     docker compose up -d
-
-                    EOF
-                    '''
+                    '
+                    """
                 }
             }
         }
