@@ -78,16 +78,17 @@ pipeline {
                     sh '''
                     scp -o StrictHostKeyChecking=no docker-compose.yml ubuntu@$DEPLOY_SERVER:/home/ubuntu/
 
-                    ssh -o StrictHostKeyChecking=no ubuntu@$DEPLOY_SERVER "
+                    ssh -o StrictHostKeyChecking=no ubuntu@$DEPLOY_SERVER << EOF
 
                     export IMAGE_TAG=$IMAGE_TAG
 
-                    docker-compose down || true
+                    docker compose down || true
 
-                    docker-compose pull
+                    docker compose pull
 
-                    docker-compose up -d
-                    "
+                    docker compose up -d
+
+                    EOF
                     '''
                 }
             }
